@@ -9,18 +9,15 @@ on:
 
 jobs:
   linux:
-    name: ${{ matrix.arch }}-linux
-    runs-on:
-      - ${{ matrix.runner_tag }}
-      - Linux
-      - podman
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - arch: x86_64
-            runner_tag: X64
-          - arch: aarch64
-            runner_tag: ARM64
+          - os: ubuntu-24.04
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
     steps:
       - name: checkout
         uses: actions/checkout@v6
@@ -28,12 +25,9 @@ jobs:
       - name: build-image
         run: |
           pushd "$(mktemp -d)"
-          curl -f -L --retry 5 https://github.com/tweag/rust-alpine-mimalloc/archive/refs/heads/master.tar.gz | tar xz --strip-components=1
-          sed -i 's/alpine:latest/alpine:edge/' Dockerfile
+          curl -f -L https://github.com/haskell-wasm/rust-alpine-mimalloc/archive/refs/heads/master.tar.gz | tar xz --strip-components=1
           podman build \
-            --network host \
             --pull \
-            --squash-all \
             --tag rust:alpine-mimalloc \
             .
           popd
@@ -42,15 +36,11 @@ jobs:
         run: |
           podman run \
             --init \
-            --network host \
             --rm \
-            --tmpfs /tmp:exec \
             --volume $PWD:/workspace \
             --workdir /workspace \
             rust:alpine-mimalloc \
-            sh -c 'TARGET=$(rustc -vV | sed -n "s|host: ||p") && exec ./build.sh --target $TARGET'
-
-          podman rmi rust:alpine-mimalloc
+            ./build.sh
 
           MIMALLOC_VERBOSE=1 ./bin/wasm-component-ld --help
           MIMALLOC_VERBOSE=1 ./bin/wasm-tools --version
@@ -76,23 +66,23 @@ jobs:
             wasm-tools-${{ github.ref_name }}-${{ matrix.arch }}-linux
 
       - name: upload-artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: wasm-tools-${{ github.ref_name }}-${{ matrix.arch }}-linux
           path: wasm-tools-${{ github.ref_name }}-${{ matrix.arch }}-linux.tar.zst
 
   darwin:
-    name: darwin-${{ matrix.arch }}
-    runs-on:
-      - ARM64
-      - macOS
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        arch:
-          - x86_64
-          - aarch64
+        include:
+          - os: macos-26-intel
+            arch: x86_64
+          - os: macos-26
+            arch: aarch64
     env:
-      MACOSX_DEPLOYMENT_TARGET: "11.0"
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
     steps:
       - name: checkout
         uses: actions/checkout@v6
@@ -121,7 +111,7 @@ jobs:
             wasm-tools-${{ github.ref_name }}-darwin-${{ matrix.arch }}
 
       - name: upload-artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: wasm-tools-${{ github.ref_name }}-darwin-${{ matrix.arch }}
           path: wasm-tools-${{ github.ref_name }}-darwin-${{ matrix.arch }}.tar.zst
