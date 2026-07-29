@@ -72,15 +72,13 @@ jobs:
           path: wasm-tools-${{ github.ref_name }}-${{ matrix.arch }}-linux.tar.zst
 
   build-darwin:
-    runs-on: ${{ matrix.os }}
+    runs-on: xcode-27
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-26-intel
-            arch: x86_64
-          - os: macos-26
-            arch: aarch64
+          - arch: x86_64
+          - arch: aarch64
     env:
       MACOSX_DEPLOYMENT_TARGET: "14.0"
     steps:
